@@ -24,5 +24,8 @@ bash build.sh
 ./FPGA_AI
 ```
 
+# Vivado design
+![Screenshot from 2024-12-27 16-19-16](https://github.com/user-attachments/assets/218a0d08-246e-4eb9-b414-54be787470bc)
+
 # Sources
 * https://github.com/nhma20/FPGA_AI/tree/ultra96-v2
