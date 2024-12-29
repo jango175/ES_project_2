@@ -9,17 +9,39 @@ sudo apt upgrade
 sudo apt install libopencv-dev
 ```
 
-3. Add submodules with:
+3. Clone following repo to a different ros workspace:
+```bash
+git clone -b $ROS_DISTRO-devel https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+```
+
+4. Move read_write_node.cpp to the ros workspace:
+```bash
+move read_write_node.cpp to src/DynamixelSDK/dynamixel_sdk_examples/src
+```
+
+5. Build workspace  and setup environment:
+```bash
+colcon build --symlink-install
+. install/local_setup.bash
+
+Allow non-root access to ttyACM with:
+sudo usermod -aG dialout mp4d
+
+run following command:
+ros2 run dynamixel_sdk_examples read_write_node
+```
+
+6. Add submodules with:
 ```bash
 git submodules update --init --recursive
 ```
 
-4. Build project with:
+7. Build project with:
 ```bash
 bash build.sh
 ```
 
-5. Start program with:
+8. Start program with:
 ```bash
 ./FPGA_AI
 ```
