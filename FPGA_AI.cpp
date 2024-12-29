@@ -4,154 +4,68 @@
 #include <vector>
 #include <ctime>
 #include <random>
+#include <cstdlib>
 #include <opencv2/opencv.hpp>
 #include "BRAM-uio-driver/src/bram_uio.h"
+#include <chrono>
+#include <thread>
 
 #define BRAM_UIO_NUMBER 0
 #define BRAM_SIZE 256
 
 namespace fs = std::experimental::filesystem;
 
+cv::Mat orig_frame;
+cv::Mat resized_frame;
+cv::Mat gray_frame;
+cv::Mat invert_frame;
+cv::Mat frame;
+int frame_count = 0;
 
-// Function to get a list of subdirectories in a given path
-std::vector<std::string> get_subdirectories(const std::string& path)
-{
-    std::vector<std::string> subdirs;
-
-    try
-    {
-        for (const auto& entry : fs::directory_iterator(path))
-        {
-            // Use status() method for checking directory
-            if (fs::is_directory(entry.status()))
-            {
-                // Extract just the folder name, not the full path
-                subdirs.push_back(entry.path().filename().string());
-            }
-        }
-    }
-    catch (const fs::filesystem_error& e)
-    {
-        std::cerr << "Error accessing directory: " << e.what() << std::endl;
-        return {};
-    }
-
-    return subdirs;
-}
-
-
-// Function to get a list of files in a directory (excluding subdirectories)
-std::vector<std::string> get_files_in_directory(const std::string& path)
-{
-    std::vector<std::string> files;
-
-    try
-    {
-        for (const auto& entry : fs::directory_iterator(path))
-        {
-            // Use status() method for checking regular file
-            if (fs::is_regular_file(entry.status()))
-            {
-                // Extract just the filename, not the full path
-                files.push_back(entry.path().filename().string());
-            }
-        }
-    }
-    catch (const fs::filesystem_error& e)
-    {
-        std::cerr << "Error accessing directory: " << e.what() << std::endl;
-        return {};
-    }
-
-    return files;
-}
-
-
-// Function to randomly select an item from a vector
-template<typename T> T select_random_item(const std::vector<T>& items)
-{
-    if (items.empty())
-    {
-        throw std::runtime_error("Vector is empty");
-    }
-
-    // Use current time as seed for random generator
-    static std::mt19937 rng(std::time(nullptr));
-
-    // Create uniform distribution across item indices
-    std::uniform_int_distribution<std::mt19937::result_type> dist(0, items.size() - 1);
-
-    // Select random index
-    size_t random_index = dist(rng);
-
-    return items[random_index];
-}
-
-
-std::string get_random_dir(std::string base_path)
-{
-    // Get list of subdirectories
-    std::vector<std::string> subdirs = get_subdirectories(base_path);
-
-    // If no directories, exit
-    if (subdirs.empty())
-    {
-        std::cerr << "No directories found in the specified path." << std::endl;
-        return NULL;
-    }
-
-    // Randomly select a directory
-    std::string selected_directory = select_random_item(subdirs);
-
-    // Construct full path to selected directory
-    fs::path full_directory_path = fs::path(base_path) / selected_directory;
-
-    // Get files in the selected directory
-    std::vector<std::string> files_in_directory = get_files_in_directory(full_directory_path.string());
-
-    // If no files, exit
-    if (files_in_directory.empty())
-    {
-        std::cerr << "No files found in the selected directory." << std::endl;
-        return NULL;
-    }
-
-    // Randomly select a file
-    std::string selected_file = select_random_item(files_in_directory);
-
-    // Full path of selected file
-    fs::path full_file_path = full_directory_path / selected_file;
-
-    return full_file_path.string();
-}
 
 
 int main(int argc, char* argv[])
 {
     BRAM bram(BRAM_UIO_NUMBER, BRAM_SIZE);
 
-    cv::Mat orig_frame;
-    cv::Mat frame;
+    // get frame from camera
+    cv::VideoCapture cap(0);
+    if (!cap.isOpened())
+    {
+        std::cerr << "Error opening camera" << std::endl;
+        return -1;
+    }
 
     while (1)
     {
-        std::string file_path = get_random_dir("/home/mp4d/Downloads/MNIST_Dataset_JPG/MNIST_JPG_testing");
-        if (file_path.empty())
-        {
-            std::cerr << "Error getting file path" << std::endl;
-            return -1;
-        }
-        std::cout << "File path: " << file_path << std::endl;
 
-        // read image from file
-        orig_frame = cv::imread(file_path, cv::IMREAD_GRAYSCALE); // read img as grayscale
+        cap.read(orig_frame);
         if (orig_frame.empty())
         {
-            std::cerr << "Error reading image from file" << std::endl;
+            std::cerr << "Error reading frame" << std::endl;
             return -1;
         }
-        cv::resize(orig_frame, frame, cv::Size(10, 10), cv::INTER_AREA); // resize img to fit dims
+
+        
+        std::this_thread::sleep_for(std::chrono::milliseconds(33));
+        cv::resize(orig_frame, resized_frame, cv::Size(10, 10), cv::INTER_AREA); // resize img to fit dims
+    
+
+        // convert the RGB image to grayscale
+        cv::cvtColor(resized_frame, gray_frame, cv::COLOR_BGR2GRAY);
+
+
+        // treshold frame
+        cv::threshold(gray_frame, invert_frame, 100, 255, cv::THRESH_BINARY);
+
+
+        // invert frame
+        cv::bitwise_not(invert_frame, frame);
+
+        // save frame
+        cv::imwrite("invertedframe.jpg", frame);
         frame.convertTo(frame, CV_32F, 1.0/255.0); // convert to float32
+
 
         uint8_t BufferPtr_rx[400] = {0x00};
         // copy image to buffer
@@ -183,15 +97,36 @@ int main(int argc, char* argv[])
             bram[i] = tempInt; // write to BRAM
         }
 
-        cv::waitKey(100);
+        std::this_thread::sleep_for(std::chrono::milliseconds(33)); // ~30 FPS
 
-        // read neural network output
-        uint32_t recognized_number = bram[128];
-        std::cout << "Recognized number: " << recognized_number << std::endl << std::endl;
+        // only read every 5th picture to eliminate delay
+        if (frame_count == 0) {
+            // print image on terminal
+            system("ascii-image-converter -C invertedframe.jpg");
+            std::cout << std::endl;
 
-        cv::waitKey(1000);
+
+            // read neural network output
+            uint32_t recognized_number = bram[128];
+            std::cout << "Recognized number: " << recognized_number << std::endl;#
+
+            // create and execute command for ros
+            std::string command = "ros2 topic pub -1 /set_position dynamixel_sdk_custom_interfaces/msg/SetPosition \"{position: " + std::to_string(recognized_number) + "}\"";
+            std::cout << "Executing command: " << command << std::endl;
+            std::system(command.c_str());
+            frame_count = frame_count + 1;
+        }
+        else if (frame_count == 4) {
+            frame_count = 0;
+        }
+        else {
+            frame_count = frame_count + 1;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+        
+        
     }
 
     return 0;
 }
-
