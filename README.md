@@ -1,3 +1,10 @@
+# Prerequisities
+
+Follow the instructions located here: https://github.com/nhma20/FPGA_AI/tree/ultra96-v2?tab=readme-ov-file#ultra96-v2-simple-neural-network-fpga-inference to train the neural network and create the custom IPs.
+
+## Vivado design
+![Screenshot from 2024-12-27 16-19-16](https://github.com/user-attachments/assets/218a0d08-246e-4eb9-b414-54be787470bc)
+
 # How to use?
 
 1. Download and unpack the dataset to `/home/mp4d/Downloads`: https://nextcloud.sdu.dk/index.php/s/wZg4FLSxgiigJTL
@@ -45,9 +52,6 @@ bash build.sh
 ```bash
 ./FPGA_AI
 ```
-
-# Vivado design
-![Screenshot from 2024-12-27 16-19-16](https://github.com/user-attachments/assets/218a0d08-246e-4eb9-b414-54be787470bc)
 
 # Sources
 * https://github.com/nhma20/FPGA_AI/tree/ultra96-v2
